@@ -63,6 +63,18 @@ def create_app(llm: LLM | None = None) -> FastAPI:
     def agents():
         return [{"id": a.id, "name": a.name} for a in state.store.agents.values()]
 
+    @app.get("/me")
+    def me(x_agent_id: str = Header()):
+        s = state.scoped(x_agent_id)
+        off = dt.datetime.now(s.tz).strftime("%z")
+        return {
+            "id": s.agent.id,
+            "name": s.agent.name,
+            "role": s.agent.role,
+            "permissions": sorted(s.agent.permissions),
+            "utc_offset": f"{off[:3]}:{off[3:]}",
+        }
+
     @app.post("/chat")
     def chat(body: ChatIn, x_agent_id: str = Header()):
         return assistant.run(state.llm, state.runner(x_agent_id), body.message, settings.max_steps)

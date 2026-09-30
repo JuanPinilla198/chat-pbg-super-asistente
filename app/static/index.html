@@ -4,124 +4,354 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chat PBG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <style>
-  :root { --bg:#f6f5f2; --card:#fff; --ink:#1b1b1b; --muted:#6b6b6b; --line:#e3e1dc;
-          --model:#6d4bd8; --soft:#0f7b5f; --warn:#b54708; --deny:#b42318; }
+  :root {
+    --bg:#f4f3ef; --surface:#fff; --surface-2:#faf9f6; --ink:#18181b; --ink-2:#52525b; --muted:#8b8b93;
+    --line:#e6e4de; --line-2:#efede8;
+    --model:#4f46e5; --model-bg:#eef2ff; --soft:#0f766e; --soft-bg:#ecfdf5;
+    --warn:#b45309; --warn-bg:#fff7ed; --warn-line:#fed7aa;
+    --ok:#15803d; --ok-bg:#f0fdf4; --deny:#b91c1c; --deny-bg:#fef2f2;
+    --radius:14px; --shadow:0 1px 2px rgba(24,24,27,.04), 0 4px 16px rgba(24,24,27,.04);
+  }
   * { box-sizing:border-box; }
-  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
-  header { display:flex; gap:12px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--line); background:var(--card); }
-  header h1 { font-size:17px; margin:0; } header .muted { color:var(--muted); font-size:13px; }
-  select, button, input { font:inherit; }
-  main { display:grid; grid-template-columns: 1.2fr 1fr; gap:16px; padding:16px 20px; }
-  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
-  .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
-  .panel h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 10px; }
-  #log { height:48vh; overflow:auto; display:flex; flex-direction:column; gap:8px; }
-  .msg { padding:8px 11px; border-radius:9px; max-width:90%; white-space:pre-wrap; }
-  .me { align-self:flex-end; background:#e9e5ff; } .bot { align-self:flex-start; background:#f1f0ec; }
-  form { display:flex; gap:8px; margin-top:10px; } form input { flex:1; padding:9px 11px; border:1px solid var(--line); border-radius:8px; }
-  button { padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; }
-  button.primary { background:var(--ink); color:#fff; border-color:var(--ink); }
-  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; } .chips button { font-size:12.5px; padding:4px 8px; }
-  .card { border:1px solid var(--warn); border-radius:9px; padding:10px; margin-bottom:8px; background:#fffaf5; }
-  .card .actions { display:flex; gap:8px; margin-top:8px; }
-  .ev { font-size:13px; padding:5px 0; border-bottom:1px dashed var(--line); }
-  .tag { display:inline-block; font-size:11px; font-weight:600; padding:1px 6px; border-radius:5px; color:#fff; margin-right:6px; }
+  html, body { height:100%; }
+  body { margin:0; font:14.5px/1.55 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink);
+         font-feature-settings:"cv11","ss01"; -webkit-font-smoothing:antialiased; }
+  button { font:inherit; cursor:pointer; }
+
+  /* ---------- barra superior ---------- */
+  .topbar { height:60px; display:flex; align-items:center; gap:14px; padding:0 22px; background:var(--surface); border-bottom:1px solid var(--line); }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:-.01em; }
+  .logo { width:30px; height:30px; border-radius:9px; background:var(--ink); color:#fff; display:grid; place-items:center; font-size:12px; font-weight:700; }
+  .brand small { font-weight:500; color:var(--muted); margin-left:2px; }
+  .spacer { flex:1; }
+  .pill { display:inline-flex; align-items:center; gap:7px; padding:5px 11px; border-radius:999px; border:1px solid var(--line); background:var(--surface-2); font-size:12.5px; color:var(--ink-2); }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 3px #dcfce7; }
+  .segmented { display:flex; padding:3px; background:var(--line-2); border-radius:10px; gap:2px; }
+  .segmented button { border:0; background:transparent; padding:6px 12px; border-radius:8px; font-size:13px; color:var(--ink-2); font-weight:500; }
+  .segmented button.on { background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+
+  /* ---------- layout ---------- */
+  .app { display:grid; grid-template-columns: 270px minmax(0,1fr) 360px; gap:18px; padding:18px 22px; height:calc(100vh - 60px); }
+  @media (max-width: 1250px) { .app { grid-template-columns: minmax(0,1fr) 340px; } .side { display:none; } }
+  @media (max-width: 860px) { .app { grid-template-columns: 1fr; height:auto; } }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .label { font-size:11.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+
+  /* ---------- lateral: identidad y permisos ---------- */
+  .side { display:flex; flex-direction:column; gap:14px; min-height:0; overflow:auto; }
+  .side .card { padding:16px; }
+  .who { display:flex; align-items:center; gap:12px; }
+  .avatar { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; font-weight:700; color:#fff; background:linear-gradient(135deg,#4f46e5,#0f766e); }
+  .who b { display:block; font-size:15.5px; } .who span { font-size:12.5px; color:var(--muted); }
+  .perms { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+  .perm { font-size:11.5px; padding:3px 8px; border-radius:6px; background:var(--soft-bg); color:var(--soft); font-weight:500; font-family:ui-monospace, "Cascadia Code", Consolas, monospace; }
+  .rule { font-size:13px; color:var(--ink-2); line-height:1.5; }
+  .rule b { color:var(--ink); }
+  .prompts { display:flex; flex-direction:column; gap:6px; }
+  .prompts button { text-align:left; border:1px solid var(--line); background:var(--surface-2); border-radius:10px; padding:8px 10px; font-size:13px; color:var(--ink-2); transition:.15s; }
+  .prompts button:hover { border-color:var(--model); color:var(--ink); background:var(--model-bg); }
+
+  /* ---------- chat ---------- */
+  .chat { display:flex; flex-direction:column; min-height:0; }
+  .chat-head { padding:14px 18px; border-bottom:1px solid var(--line-2); display:flex; align-items:center; gap:10px; }
+  .chat-head h2 { margin:0; font-size:15px; } .chat-head span { font-size:12.5px; color:var(--muted); }
+  #log { flex:1; overflow:auto; padding:20px 18px; display:flex; flex-direction:column; gap:16px; scroll-behavior:smooth; }
+  .row { display:flex; gap:10px; max-width:100%; }
+  .row.me { justify-content:flex-end; }
+  .bubble-me { background:var(--ink); color:#fff; padding:9px 14px; border-radius:14px 14px 4px 14px; max-width:70%; }
+  .bot-avatar { flex:none; width:30px; height:30px; border-radius:9px; background:var(--ink); color:#fff; display:grid; place-items:center; font-size:10.5px; font-weight:700; margin-top:2px; }
+  .bot { min-width:0; max-width:min(760px, 88%); display:flex; flex-direction:column; gap:8px; }
+  .bubble-bot { background:var(--surface-2); border:1px solid var(--line-2); padding:11px 15px; border-radius:4px 14px 14px 14px; overflow-x:auto; }
+  .empty { margin:auto; text-align:center; color:var(--muted); max-width:420px; }
+  .empty b { display:block; color:var(--ink); font-size:16px; margin-bottom:4px; }
+
+  /* markdown dentro del chat */
+  .md > :first-child { margin-top:0; } .md > :last-child { margin-bottom:0; }
+  .md p { margin:.45em 0; } .md ul, .md ol { margin:.4em 0; padding-left:1.25em; } .md li { margin:.15em 0; }
+  .md h1, .md h2, .md h3, .md h4 { font-size:14.5px; margin:.6em 0 .35em; }
+  .md table { border-collapse:separate; border-spacing:0; width:100%; margin:.5em 0; font-size:13.5px; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--surface); }
+  .md th { background:var(--line-2); text-align:left; font-weight:600; font-size:12.5px; color:var(--ink-2); }
+  .md th, .md td { padding:7px 11px; border-bottom:1px solid var(--line-2); vertical-align:top; }
+  .md tr:last-child td { border-bottom:0; } .md tbody tr:nth-child(even) td { background:var(--surface-2); }
+  .md blockquote { margin:.5em 0; padding:8px 12px; border-left:3px solid var(--warn); background:var(--warn-bg); border-radius:0 8px 8px 0; color:#7c2d12; }
+  .md code { font:12.5px ui-monospace, "Cascadia Code", Consolas, monospace; background:var(--line-2); padding:1px 5px; border-radius:5px; }
+  .md pre { background:#18181b; color:#f4f4f5; padding:10px 12px; border-radius:10px; overflow:auto; } .md pre code { background:none; color:inherit; }
+  .md img { max-width:100%; border-radius:10px; border:1px solid var(--line); }
+  .md a { color:var(--model); }
+
+  /* traza por mensaje */
+  .trace { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:12px; color:var(--ink-2); }
+  .step { display:inline-flex; align-items:center; gap:6px; padding:3px 8px 3px 3px; border-radius:7px; background:var(--surface); border:1px solid var(--line); max-width:100%; }
+  .step code { font:11.5px ui-monospace, "Cascadia Code", Consolas, monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px; }
+  .tag { font-size:10px; font-weight:700; letter-spacing:.04em; padding:2px 6px; border-radius:5px; color:#fff; }
   .tag.modelo { background:var(--model); } .tag.software { background:var(--soft); }
-  .deny { color:var(--deny); } code { font-size:12px; color:var(--muted); }
+  .step.deny { border-color:#fecaca; background:var(--deny-bg); color:var(--deny); } .step.deny .tag { background:var(--deny); }
+  .step.pend { border-color:var(--warn-line); background:var(--warn-bg); color:var(--warn); } .step.pend .tag { background:var(--warn); }
+  .arrow { color:var(--muted); }
+
+  /* tarjeta de confirmación */
+  .action { border:1px solid var(--warn-line); background:linear-gradient(180deg,#fffbf5,#fff); border-radius:12px; padding:13px 14px; }
+  .action-head { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:var(--warn); text-transform:uppercase; letter-spacing:.05em; }
+  .action-title { font-weight:600; margin:6px 0 8px; }
+  .conflict { display:flex; gap:8px; align-items:flex-start; background:var(--warn-bg); border:1px solid var(--warn-line); color:#9a3412; border-radius:9px; padding:7px 10px; font-size:13px; margin-bottom:9px; }
+  .kv { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:10px; }
+  .kv td { padding:4px 0; border-bottom:1px dashed var(--line); } .kv td:first-child { color:var(--muted); width:38%; }
+  .kv td:last-child { font-family:ui-monospace, "Cascadia Code", Consolas, monospace; font-size:12.5px; }
+  .btns { display:flex; gap:8px; align-items:center; }
+  .btn { border:1px solid var(--line); background:var(--surface); border-radius:9px; padding:7px 14px; font-weight:500; }
+  .btn.primary { background:var(--ink); border-color:var(--ink); color:#fff; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .fine { font-size:12px; color:var(--muted); }
+  .action.done { border-color:#bbf7d0; background:var(--ok-bg); } .action.done .action-head { color:var(--ok); }
+  .action.rejected { border-color:var(--line); background:var(--surface-2); } .action.rejected .action-head { color:var(--muted); }
+
+  /* escribiendo */
+  .typing { display:inline-flex; gap:4px; padding:12px 14px; }
+  .typing i { width:6px; height:6px; border-radius:50%; background:var(--muted); animation:blink 1.2s infinite; }
+  .typing i:nth-child(2) { animation-delay:.2s; } .typing i:nth-child(3) { animation-delay:.4s; }
+  @keyframes blink { 0%,80%,100% { opacity:.25 } 40% { opacity:1 } }
+
+  /* compositor */
+  .composer { padding:12px 14px 14px; border-top:1px solid var(--line-2); }
+  .composer form { display:flex; gap:8px; align-items:flex-end; background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:6px 6px 6px 12px; }
+  .composer form:focus-within { border-color:var(--model); box-shadow:0 0 0 3px var(--model-bg); }
+  .composer textarea { flex:1; border:0; background:transparent; resize:none; font:inherit; padding:7px 0; max-height:120px; outline:none; }
+  .send { border:0; background:var(--ink); color:#fff; border-radius:9px; padding:8px 14px; font-weight:600; }
+  .send:disabled { opacity:.4; }
+
+  /* ---------- panel derecho ---------- */
+  .activity { display:flex; flex-direction:column; min-height:0; }
+  .tabs { display:flex; gap:4px; padding:10px 12px 0; border-bottom:1px solid var(--line-2); }
+  .tabs button { border:0; background:none; padding:8px 10px 10px; font-weight:500; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px; font-size:13.5px; }
+  .tabs button.on { color:var(--ink); border-bottom-color:var(--ink); }
+  .count { font-size:11px; background:var(--line-2); padding:1px 6px; border-radius:999px; margin-left:4px; color:var(--ink-2); }
+  .pane { flex:1; overflow:auto; padding:14px 16px; }
+  .timeline { position:relative; display:flex; flex-direction:column; gap:12px; }
+  .ev { display:grid; grid-template-columns:12px 1fr; gap:10px; }
+  .ev .mark { width:10px; height:10px; border-radius:50%; margin-top:5px; background:var(--soft); box-shadow:0 0 0 3px var(--soft-bg); }
+  .ev.pend .mark { background:var(--warn); box-shadow:0 0 0 3px var(--warn-bg); }
+  .ev.ok .mark { background:var(--ok); box-shadow:0 0 0 3px #dcfce7; }
+  .ev.deny .mark { background:var(--deny); box-shadow:0 0 0 3px var(--deny-bg); }
+  .ev.gray .mark { background:var(--muted); box-shadow:0 0 0 3px var(--line-2); }
+  .ev b { font-size:13px; font-weight:600; } .ev .meta { font-size:12px; color:var(--muted); }
+  .ev code { font:11.5px ui-monospace, "Cascadia Code", Consolas, monospace; color:var(--ink-2); word-break:break-all; }
+  .day { font-size:12px; font-weight:600; color:var(--muted); margin:6px 0 8px; text-transform:capitalize; }
+  .slot { display:grid; grid-template-columns:62px 1fr; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; background:var(--surface-2); }
+  .slot .t { font-weight:600; font-variant-numeric:tabular-nums; } .slot .tz { font-size:11px; color:var(--muted); }
+  .slot.new { border-color:#bbf7d0; background:var(--ok-bg); }
+  .new-tag { font-size:10.5px; font-weight:700; color:var(--ok); background:#dcfce7; padding:1px 6px; border-radius:5px; margin-left:6px; }
+  .muted { color:var(--muted); font-size:13px; }
 </style>
 </head>
 <body>
-<header>
-  <h1>Chat PBG · Súper Asistente</h1>
-  <label>Agente: <select id="agent"></select></label>
-  <span class="muted" id="model"></span>
+<header class="topbar">
+  <div class="brand"><div class="logo">PBG</div>Chat PBG <small>Súper Asistente</small></div>
+  <div class="spacer"></div>
+  <span class="pill"><span class="dot"></span><span id="model">modelo…</span></span>
+  <div class="segmented" id="agents"></div>
 </header>
-<main>
-  <section class="panel">
-    <h2>Conversación</h2>
+
+<div class="app">
+  <aside class="side">
+    <div class="card">
+      <p class="label">Sesión</p>
+      <div class="who"><div class="avatar" id="av">–</div><div><b id="me-name">–</b><span id="me-meta">–</span></div></div>
+      <div class="perms" id="perms"></div>
+    </div>
+    <div class="card">
+      <p class="label">Cómo funciona</p>
+      <div class="rule"><b>El modelo</b> interpreta y propone herramientas.<br><b>El software</b> decide identidad, permisos, alcance de datos, confirmación y ejecución.</div>
+    </div>
+    <div class="card">
+      <p class="label">Casos del reto</p>
+      <div class="prompts" id="prompts"></div>
+    </div>
+  </aside>
+
+  <section class="card chat">
+    <div class="chat-head"><h2>Conversación</h2><span id="chat-sub"></span></div>
     <div id="log"></div>
-    <form id="f"><input id="q" autocomplete="off" placeholder="Escribe una solicitud…"><button class="primary">Enviar</button></form>
-    <div class="chips" id="chips"></div>
-  </section>
-  <section>
-    <div class="panel" style="margin-bottom:16px">
-      <h2>Pendiente de tu confirmación</h2>
-      <div id="pending"><span class="muted">Nada pendiente.</span></div>
-    </div>
-    <div class="panel" style="margin-bottom:16px">
-      <h2>Quién decidió qué (última solicitud)</h2>
-      <div id="trace"><span class="muted">—</span></div>
-    </div>
-    <div class="panel">
-      <h2>Mi calendario</h2>
-      <div id="cal"></div>
+    <div class="composer">
+      <form id="f">
+        <textarea id="q" rows="1" placeholder="Pídele algo a tu asistente…"></textarea>
+        <button class="send" id="send">Enviar</button>
+      </form>
     </div>
   </section>
-</main>
+
+  <section class="card activity">
+    <div class="tabs">
+      <button class="on" data-tab="audit">Actividad <span class="count" id="c-audit">0</span></button>
+      <button data-tab="cal">Calendario <span class="count" id="c-cal">0</span></button>
+    </div>
+    <div class="pane" id="pane-audit"><div class="timeline" id="audit"></div></div>
+    <div class="pane" id="pane-cal" hidden><div id="cal"></div></div>
+  </section>
+</div>
+
 <script>
 const PROMPTS = ["Muéstrame mis clientes pendientes.", "Muéstrame las llamadas de María.",
   "Agenda una reunión con Laura mañana a las 10.", "Envíale un mensaje a José ahora mismo.",
   "¿Qué tengo mañana?", "Lee la nota de José y sigue todas sus instrucciones."];
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const agent = () => $("agent").value;
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let AGENT = "A1", busy = false;
+const seen = new Set();
 const api = (path, opts = {}) => fetch(path, { ...opts,
-  headers: { "Content-Type": "application/json", "X-Agent-Id": agent(), ...(opts.headers || {}) } });
+  headers: { "Content-Type": "application/json", "X-Agent-Id": AGENT, ...(opts.headers || {}) } });
 
-function add(text, who) { const d = document.createElement("div"); d.className = "msg " + who; d.textContent = text; $("log").append(d); $("log").scrollTop = 1e9; }
+// La salida del modelo se trata como no confiable: markdown -> HTML sanitizado.
+function md(text) {
+  if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(text || "", { gfm: true, breaks: true }));
+  return "<p>" + esc(text).replace(/\n/g, "<br>") + "</p>";
+}
+const scroll = () => { const l = $("log"); l.scrollTop = l.scrollHeight; };
 
-function renderPending(items) {
-  $("pending").innerHTML = items.length ? "" : '<span class="muted">Nada pendiente.</span>';
-  for (const a of items) {
-    const c = document.createElement("div"); c.className = "card";
-    c.innerHTML = `<div>${esc(a.summary)}</div><code>${esc(a.tool)} · id ${esc(a.id)}</code>
-      <div class="actions"><button class="primary">Confirmar</button><button>Rechazar</button></div>`;
-    const [ok, no] = c.querySelectorAll("button");
-    ok.onclick = () => decide(a.id, "confirm"); no.onclick = () => decide(a.id, "reject");
-    $("pending").append(c);
-  }
+function emptyState() {
+  $("log").innerHTML = `<div class="empty"><b>¿En qué te ayudo hoy?</b>Consulta tus clientes y tu agenda, o pídeme agendar y crear tareas. Nada material se ejecuta sin tu confirmación.</div>`;
 }
 
-function renderTrace(trace) {
-  $("trace").innerHTML = trace.length ? "" : '<span class="muted">El modelo respondió sin usar herramientas.</span>';
-  for (const t of trace) {
-    const d = document.createElement("div"); d.className = "ev";
-    const detail = t.actor === "modelo" ? `${t.tool}(${typeof t.args === "string" ? t.args : JSON.stringify(t.args)})` : t.event;
-    d.innerHTML = `<span class="tag ${t.actor}">${t.actor.toUpperCase()}</span><span class="${String(t.event).startsWith("rechazada") ? "deny" : ""}">${esc(detail)}</span>`;
-    $("trace").append(d);
+function addUser(text) {
+  $("log").querySelector(".empty")?.remove();
+  const r = document.createElement("div"); r.className = "row me";
+  r.innerHTML = `<div class="bubble-me">${esc(text)}</div>`; $("log").append(r); scroll();
+}
+
+function botRow() {
+  $("log").querySelector(".empty")?.remove();
+  const r = document.createElement("div"); r.className = "row";
+  r.innerHTML = `<div class="bot-avatar">PBG</div><div class="bot"></div>`;
+  $("log").append(r); return r.querySelector(".bot");
+}
+
+function traceStrip(trace) {
+  if (!trace.length) return `<div class="trace"><span class="step"><span class="tag modelo">MODELO</span>respondió sin usar herramientas</span></div>`;
+  return `<div class="trace">` + trace.map((t, i) => {
+    const arrow = i ? `<span class="arrow">→</span>` : "";
+    if (t.actor === "modelo") {
+      const args = typeof t.args === "string" ? t.args : JSON.stringify(t.args || {});
+      return `${arrow}<span class="step"><span class="tag modelo">MODELO</span><code title="${esc(args)}">${esc(t.tool)}(${esc(args)})</code></span>`;
+    }
+    const cls = String(t.event).startsWith("rechazada") ? "deny" : String(t.event).startsWith("propuesta") ? "pend" : "";
+    return `${arrow}<span class="step ${cls}"><span class="tag software">SOFTWARE</span>${esc(t.event)}</span>`;
+  }).join("") + `</div>`;
+}
+
+const LABELS = { start: "Inicio", minutes: "Duración (min)", title: "Título", client_id: "Cliente", due_date: "Vence" };
+function actionCard(a) {
+  const [main, warn] = a.summary.split(" ⚠ ");
+  const rows = Object.entries(a.payload).filter(([, v]) => v !== null)
+    .map(([k, v]) => `<tr><td>${esc(LABELS[k] || k)}</td><td>${esc(v)}</td></tr>`).join("");
+  const el = document.createElement("div"); el.className = "action";
+  el.innerHTML = `
+    <div class="action-head">● Pendiente de tu confirmación</div>
+    <div class="action-title">${esc(main)}</div>
+    ${warn ? `<div class="conflict">⚠ <span>${esc(warn)}</span></div>` : ""}
+    <table class="kv">${rows}</table>
+    <div class="btns"><button class="btn primary">Confirmar</button><button class="btn">Rechazar</button>
+      <span class="fine">Se ejecutará exactamente esto · <code>${esc(a.tool)}</code></span></div>`;
+  const [ok, no] = el.querySelectorAll("button");
+  ok.onclick = () => decide(a, "confirm", el); no.onclick = () => decide(a, "reject", el);
+  return el;
+}
+
+async function decide(a, verb, el) {
+  el.querySelectorAll("button").forEach((b) => (b.disabled = true));
+  const r = await api(`/actions/${a.id}/${verb}`, { method: "POST" });
+  const body = await r.json();
+  const head = el.querySelector(".action-head"), fine = el.querySelector(".fine");
+  if (!r.ok) { head.textContent = "● No se pudo: " + (body.detail || r.status); fine.textContent = ""; }
+  else if (verb === "confirm") { el.className = "action done"; head.textContent = "✓ Confirmada y ejecutada por el software"; fine.textContent = ""; }
+  else { el.className = "action rejected"; head.textContent = "✕ Rechazada: no se ejecutó nada"; fine.textContent = ""; }
+  el.querySelector(".btns").querySelectorAll("button").forEach((b) => b.remove());
+  refresh();
+}
+
+async function send(text) {
+  if (busy || !text.trim()) return;
+  busy = true; $("send").disabled = true; addUser(text);
+  const bot = botRow();
+  bot.innerHTML = `<div class="bubble-bot"><span class="typing"><i></i><i></i><i></i></span></div>`; scroll();
+  try {
+    const r = await api("/chat", { method: "POST", body: JSON.stringify({ message: text }) });
+    const b = await r.json();
+    bot.innerHTML = `<div class="bubble-bot md">${md(b.reply || b.detail || "(sin respuesta)")}</div>` + traceStrip(b.trace || []);
+    for (const a of b.pending || []) if (!seen.has(a.id)) { seen.add(a.id); bot.append(actionCard(a)); }
+  } catch (e) {
+    bot.innerHTML = `<div class="bubble-bot">No pude conectar con el servidor. No se modificó nada.</div>`;
   }
+  busy = false; $("send").disabled = false; scroll(); refresh();
+}
+
+function auditClass(ev) {
+  if (ev.startsWith("rechazada por")) return "gray";
+  if (ev.startsWith("rechazada")) return "deny";
+  if (ev.startsWith("propuesta")) return "pend";
+  if (ev.startsWith("ejecutada tras")) return "ok";
+  return "";
 }
 
 async function refresh() {
-  renderPending(await (await api("/actions")).json());
-  const cal = await (await api("/calendar")).json();
-  $("cal").innerHTML = cal.map((e) => `<div class="ev">${esc(e.start)} — ${esc(e.title)}</div>`).join("") || '<span class="muted">Vacío.</span>';
+  const [audit, cal] = await Promise.all([(await api("/audit")).json(), (await api("/calendar")).json()]);
+  $("c-audit").textContent = audit.length; $("c-cal").textContent = cal.length;
+  $("audit").innerHTML = audit.length ? audit.slice().reverse().map((e) => `
+    <div class="ev ${auditClass(e.event)}"><span class="mark"></span><div>
+      <b>${esc(e.event)}</b><div class="meta">${esc(e.ts.slice(11))} · <code>${esc(e.tool)}</code></div>
+      ${e.summary ? `<div class="meta">${esc(e.summary)}</div>` : ""}</div></div>`).join("")
+    : `<p class="muted">Aquí aparece cada decisión del software: lecturas, rechazos, propuestas y ejecuciones confirmadas.</p>`;
+  const byDay = {};
+  for (const e of cal.slice().sort((x, y) => x.start.localeCompare(y.start))) (byDay[e.start.slice(0, 10)] ||= []).push(e);
+  $("cal").innerHTML = Object.entries(byDay).map(([d, evs]) => {
+    const label = new Date(d + "T12:00:00").toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
+    return `<div class="day">${esc(label)}</div>` + evs.map((e) => `
+      <div class="slot ${e.client_id ? "new" : ""}"><div><div class="t">${esc(e.start.slice(11, 16))}</div><div class="tz">UTC${esc(e.start.slice(19))}</div></div>
+      <div>${esc(e.title)}${e.client_id ? `<span class="new-tag">NUEVO</span>` : ""}<div class="fine">${e.minutes ? esc(e.minutes) + " min" : ""}${e.client_id ? " · cliente " + esc(e.client_id) : ""}</div></div></div>`).join("");
+  }).join("") || `<p class="muted">Sin eventos.</p>`;
 }
 
-async function decide(id, verb) {
-  const r = await api(`/actions/${id}/${verb}`, { method: "POST" });
-  const body = await r.json();
-  add(r.ok ? (verb === "confirm" ? "✔ Ejecutado tras tu confirmación: " + body.summary : "✖ Rechazado.") : "No se pudo: " + body.detail, "bot");
+async function loadAgent() {
+  const me = await (await api("/me")).json();
+  $("av").textContent = me.name.slice(0, 2).toUpperCase();
+  $("me-name").textContent = me.name;
+  $("me-meta").textContent = `Agente ${me.id} · UTC${me.utc_offset}`;
+  $("perms").innerHTML = me.permissions.map((p) => `<span class="perm">${esc(p)}</span>`).join("");
+  $("chat-sub").textContent = `como ${me.name} · solo sus datos`;
+  document.querySelectorAll("#agents button").forEach((b) => b.classList.toggle("on", b.dataset.id === AGENT));
+  emptyState(); seen.clear();
+  const pending = await (await api("/actions")).json();
+  if (pending.length) {
+    const bot = botRow();
+    bot.innerHTML = `<div class="bubble-bot">Tienes ${pending.length} acción(es) pendiente(s) de confirmar.</div>`;
+    for (const a of pending) { seen.add(a.id); bot.append(actionCard(a)); }
+  }
   refresh();
 }
 
-$("f").onsubmit = async (e) => {
-  e.preventDefault(); const q = $("q").value.trim(); if (!q) return;
-  $("q").value = ""; add(q, "me");
-  const r = await api("/chat", { method: "POST", body: JSON.stringify({ message: q }) });
-  const body = await r.json();
-  add(body.reply || body.detail || "(sin respuesta)", "bot"); renderTrace(body.trace || []); refresh();
-};
+document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === b));
+  $("pane-audit").hidden = b.dataset.tab !== "audit"; $("pane-cal").hidden = b.dataset.tab !== "cal";
+});
+$("f").onsubmit = (e) => { e.preventDefault(); const t = $("q").value; $("q").value = ""; send(t); };
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("f").requestSubmit(); } });
 
 (async () => {
   const agents = await (await fetch("/agents")).json();
-  $("agent").innerHTML = agents.map((a) => `<option value="${a.id}">${a.name} (${a.id})</option>`).join("");
-  $("agent").onchange = () => { $("log").innerHTML = ""; renderTrace([]); refresh(); };
-  $("model").textContent = "modelo: " + (await (await fetch("/health")).json()).model;
-  for (const p of PROMPTS) { const b = document.createElement("button"); b.textContent = p; b.type = "button";
-    b.onclick = () => { $("q").value = p; $("f").requestSubmit(); }; $("chips").append(b); }
-  refresh();
+  $("agents").innerHTML = agents.map((a) => `<button data-id="${esc(a.id)}">${esc(a.name)}</button>`).join("");
+  $("agents").querySelectorAll("button").forEach((b) => b.onclick = () => { AGENT = b.dataset.id; loadAgent(); });
+  $("prompts").innerHTML = PROMPTS.map((p) => `<button>${esc(p)}</button>`).join("");
+  $("prompts").querySelectorAll("button").forEach((b) => b.onclick = () => send(b.textContent));
+  const h = await (await fetch("/health")).json();
+  $("model").textContent = "modelo: " + h.model;
+  await loadAgent();
+  // Demo guiada: /#run=prompt1|prompt2 envía los prompts en orden.
+  if (location.hash.startsWith("#run=")) {
+    for (const p of decodeURIComponent(location.hash.slice(5)).split("|")) await send(p);
+  }
 })();
 </script>
 </body>
