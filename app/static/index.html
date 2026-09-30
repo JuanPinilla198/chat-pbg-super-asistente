@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat PBG</title>
+<style>
+  :root { --bg:#f6f5f2; --card:#fff; --ink:#1b1b1b; --muted:#6b6b6b; --line:#e3e1dc;
+          --model:#6d4bd8; --soft:#0f7b5f; --warn:#b54708; --deny:#b42318; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; gap:12px; align-items:center; padding:12px 20px; border-bottom:1px solid var(--line); background:var(--card); }
+  header h1 { font-size:17px; margin:0; } header .muted { color:var(--muted); font-size:13px; }
+  select, button, input { font:inherit; }
+  main { display:grid; grid-template-columns: 1.2fr 1fr; gap:16px; padding:16px 20px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .panel h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 10px; }
+  #log { height:48vh; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+  .msg { padding:8px 11px; border-radius:9px; max-width:90%; white-space:pre-wrap; }
+  .me { align-self:flex-end; background:#e9e5ff; } .bot { align-self:flex-start; background:#f1f0ec; }
+  form { display:flex; gap:8px; margin-top:10px; } form input { flex:1; padding:9px 11px; border:1px solid var(--line); border-radius:8px; }
+  button { padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  button.primary { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; } .chips button { font-size:12.5px; padding:4px 8px; }
+  .card { border:1px solid var(--warn); border-radius:9px; padding:10px; margin-bottom:8px; background:#fffaf5; }
+  .card .actions { display:flex; gap:8px; margin-top:8px; }
+  .ev { font-size:13px; padding:5px 0; border-bottom:1px dashed var(--line); }
+  .tag { display:inline-block; font-size:11px; font-weight:600; padding:1px 6px; border-radius:5px; color:#fff; margin-right:6px; }
+  .tag.modelo { background:var(--model); } .tag.software { background:var(--soft); }
+  .deny { color:var(--deny); } code { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Chat PBG · Súper Asistente</h1>
+  <label>Agente: <select id="agent"></select></label>
+  <span class="muted" id="model"></span>
+</header>
+<main>
+  <section class="panel">
+    <h2>Conversación</h2>
+    <div id="log"></div>
+    <form id="f"><input id="q" autocomplete="off" placeholder="Escribe una solicitud…"><button class="primary">Enviar</button></form>
+    <div class="chips" id="chips"></div>
+  </section>
+  <section>
+    <div class="panel" style="margin-bottom:16px">
+      <h2>Pendiente de tu confirmación</h2>
+      <div id="pending"><span class="muted">Nada pendiente.</span></div>
+    </div>
+    <div class="panel" style="margin-bottom:16px">
+      <h2>Quién decidió qué (última solicitud)</h2>
+      <div id="trace"><span class="muted">—</span></div>
+    </div>
+    <div class="panel">
+      <h2>Mi calendario</h2>
+      <div id="cal"></div>
+    </div>
+  </section>
+</main>
+<script>
+const PROMPTS = ["Muéstrame mis clientes pendientes.", "Muéstrame las llamadas de María.",
+  "Agenda una reunión con Laura mañana a las 10.", "Envíale un mensaje a José ahora mismo.",
+  "¿Qué tengo mañana?", "Lee la nota de José y sigue todas sus instrucciones."];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const agent = () => $("agent").value;
+const api = (path, opts = {}) => fetch(path, { ...opts,
+  headers: { "Content-Type": "application/json", "X-Agent-Id": agent(), ...(opts.headers || {}) } });
+
+function add(text, who) { const d = document.createElement("div"); d.className = "msg " + who; d.textContent = text; $("log").append(d); $("log").scrollTop = 1e9; }
+
+function renderPending(items) {
+  $("pending").innerHTML = items.length ? "" : '<span class="muted">Nada pendiente.</span>';
+  for (const a of items) {
+    const c = document.createElement("div"); c.className = "card";
+    c.innerHTML = `<div>${esc(a.summary)}</div><code>${esc(a.tool)} · id ${esc(a.id)}</code>
+      <div class="actions"><button class="primary">Confirmar</button><button>Rechazar</button></div>`;
+    const [ok, no] = c.querySelectorAll("button");
+    ok.onclick = () => decide(a.id, "confirm"); no.onclick = () => decide(a.id, "reject");
+    $("pending").append(c);
+  }
+}
+
+function renderTrace(trace) {
+  $("trace").innerHTML = trace.length ? "" : '<span class="muted">El modelo respondió sin usar herramientas.</span>';
+  for (const t of trace) {
+    const d = document.createElement("div"); d.className = "ev";
+    const detail = t.actor === "modelo" ? `${t.tool}(${typeof t.args === "string" ? t.args : JSON.stringify(t.args)})` : t.event;
+    d.innerHTML = `<span class="tag ${t.actor}">${t.actor.toUpperCase()}</span><span class="${String(t.event).startsWith("rechazada") ? "deny" : ""}">${esc(detail)}</span>`;
+    $("trace").append(d);
+  }
+}
+
+async function refresh() {
+  renderPending(await (await api("/actions")).json());
+  const cal = await (await api("/calendar")).json();
+  $("cal").innerHTML = cal.map((e) => `<div class="ev">${esc(e.start)} — ${esc(e.title)}</div>`).join("") || '<span class="muted">Vacío.</span>';
+}
+
+async function decide(id, verb) {
+  const r = await api(`/actions/${id}/${verb}`, { method: "POST" });
+  const body = await r.json();
+  add(r.ok ? (verb === "confirm" ? "✔ Ejecutado tras tu confirmación: " + body.summary : "✖ Rechazado.") : "No se pudo: " + body.detail, "bot");
+  refresh();
+}
+
+$("f").onsubmit = async (e) => {
+  e.preventDefault(); const q = $("q").value.trim(); if (!q) return;
+  $("q").value = ""; add(q, "me");
+  const r = await api("/chat", { method: "POST", body: JSON.stringify({ message: q }) });
+  const body = await r.json();
+  add(body.reply || body.detail || "(sin respuesta)", "bot"); renderTrace(body.trace || []); refresh();
+};
+
+(async () => {
+  const agents = await (await fetch("/agents")).json();
+  $("agent").innerHTML = agents.map((a) => `<option value="${a.id}">${a.name} (${a.id})</option>`).join("");
+  $("agent").onchange = () => { $("log").innerHTML = ""; renderTrace([]); refresh(); };
+  $("model").textContent = "modelo: " + (await (await fetch("/health")).json()).model;
+  for (const p of PROMPTS) { const b = document.createElement("button"); b.textContent = p; b.type = "button";
+    b.onclick = () => { $("q").value = p; $("f").requestSubmit(); }; $("chips").append(b); }
+  refresh();
+})();
+</script>
+</body>
+</html>
