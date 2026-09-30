@@ -174,7 +174,7 @@ class ToolRunner:
                 if abs(dt.datetime.fromisoformat(ev["start"]) - start)
                 < dt.timedelta(minutes=max(args.duration_minutes, ev.get("minutes", 30)))
             ]
-            summary = f"Agendar '{title}' con {client['name']} el {_fmt(start)}, {args.duration_minutes} min."
+            summary = f"Agendar '{title}' (cliente {client['id']}) el {_fmt(start)}, {args.duration_minutes} min."
             if conflicts:
                 summary += " ⚠ Conflicto con: " + ", ".join(conflicts) + "."
             payload = {
