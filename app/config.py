@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # Proveedores compatibles con la API de OpenAI: cambiar de proveedor es cambiar el .env.
 PROVIDERS = {
-    "groq": ("https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+    "groq": ("https://api.groq.com/openai/v1", "openai/gpt-oss-120b"),
     "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.5-flash"),
     "openai": ("https://api.openai.com/v1", "gpt-4.1-mini"),
 }

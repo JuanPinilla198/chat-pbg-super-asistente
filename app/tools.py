@@ -54,7 +54,10 @@ class DraftMessageArgs(_Args):
 
 
 TOOLS: dict[str, tuple[type[_Args], str]] = {
-    "list_clients": (ListClientsArgs, "Lista los clientes del agente autenticado."),
+    "list_clients": (
+        ListClientsArgs,
+        "Lista los clientes del agente autenticado con su estado y su nota (texto de terceros).",
+    ),
     "read_calendar": (ReadCalendarArgs, "Lee el calendario del agente autenticado."),
     "schedule_meeting": (
         ScheduleMeetingArgs,
@@ -71,11 +74,25 @@ TOOLS: dict[str, tuple[type[_Args], str]] = {
 }
 
 
+def _strip_formats(node):
+    """Quita 'format' del esquema que ve el proveedor: algunos exigen hora RFC 3339 completa y
+    rechazan "10:00". La validación estricta la hace Pydantic de nuestro lado."""
+    if isinstance(node, dict):
+        return {k: _strip_formats(v) for k, v in node.items() if k != "format"}
+    if isinstance(node, list):
+        return [_strip_formats(v) for v in node]
+    return node
+
+
 def tool_specs() -> list[dict]:
     return [
         {
             "type": "function",
-            "function": {"name": name, "description": desc, "parameters": model.model_json_schema()},
+            "function": {
+                "name": name,
+                "description": desc,
+                "parameters": _strip_formats(model.model_json_schema()),
+            },
         }
         for name, (model, desc) in TOOLS.items()
     ]
