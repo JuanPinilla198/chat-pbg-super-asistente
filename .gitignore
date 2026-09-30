@@ -1,0 +1,22 @@
+# Secretos
+.env
+
+# Entornos y cachés
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Artefactos de modelos (borra la línea correspondiente si decides versionar uno pequeño)
+models/*.pt
+models/*.joblib
+models/*.pkl
+
+# Datos crudos grandes
+data/raw/
+
+*.log

@@ -1,0 +1,27 @@
+{
+  "tools": [
+    {
+      "name": "list_clients",
+      "write": false
+    },
+    {
+      "name": "read_calendar",
+      "write": false
+    },
+    {
+      "name": "schedule_meeting",
+      "write": true,
+      "requires_confirmation": true
+    },
+    {
+      "name": "create_task",
+      "write": true,
+      "requires_confirmation": true
+    },
+    {
+      "name": "draft_message",
+      "write": false,
+      "note": "May draft, but platform must not send as agent."
+    }
+  ]
+}

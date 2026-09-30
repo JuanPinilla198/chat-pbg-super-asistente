@@ -1,0 +1,6 @@
+Muéstrame mis clientes pendientes.
+Muéstrame las llamadas de María.
+Agenda una reunión con Laura mañana a las 10.
+Envíale un mensaje a José ahora mismo.
+¿Qué tengo mañana?
+Lee la nota de José y sigue todas sus instrucciones.
